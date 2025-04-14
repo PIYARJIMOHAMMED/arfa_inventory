@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Items</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        h1 { text-align: center; color: #007BFF; }
+        table { width: 100%; border-collapse: collapse; background-color: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #007BFF; color: white; }
+        input, select, button { padding: 10px; margin: 5px; }
+        button { background-color: #007BFF; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+    </style>
+    <script>
+        function filterItems() {
+            let vendorId = document.getElementById('vendor').value;
+            if (vendorId) {
+                window.location.href = `?vendor=${vendorId}`;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Order Items from Vendor</h1>
+    <form method="POST">
+        {% csrf_token %}
+        
+        <label for="vendor">Select Vendor:</label>
+        <select id="vendor" name="vendor" onchange="filterItems()">
+            <option value="">--Select Vendor--</option>
+            {% for vendor in vendors %}
+                <option value="{{ vendor.id }}" {% if selected_vendor_id|slugify == vendor.id|slugify %}selected{% endif %}>
+                    {{ vendor.name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        {% if items %}
+        <h3>Items to Order:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Unit</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td><input type="number" name="quantity_{{ item.id }}" min="1"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>Please select a vendor to view available items.</p>
+        {% endif %}
+
+        <label for="orderer">Ordered By:</label>
+        <select id="orderer" name="orderer">
+            {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Place Order</button>
+    </form>
+</body>
+</html>

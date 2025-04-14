@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chicken Price Calculation - Cafe Arfa</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin: 20px auto;
+            max-width: 600px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #343a40;
+        }
+        button {
+            width: 100%;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        table {
+            width: 100%;
+            margin-bottom: 20px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        input[type="number"] {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+        }
+        @media (max-width: 576px) {
+            h2 {
+                font-size: 24px; 
+            }
+            .container {
+                padding: 15px; 
+                margin: 10px; 
+                box-shadow: none; 
+                border-radius: 0; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Chicken Price Calculation</h2>
+    <form method="post" action="{% url 'save_chicken_order' %}">
+        {% csrf_token %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Rate (Per KG)</th>
+                    <th>Quantity (KG)</th>
+                    <th>Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item, rate in calculations.items %}
+                <tr>
+                    <td>{{ item|capfirst }}</td>
+                    <td><input type="number" name="rate_{{ item }}" value="{{ rate }}" step="0.1" readonly></td>
+                    <td><input type="number" name="qty_{{ item }}" value="0" step="0.1" class="kg-input" data-rate="{{ rate }}"></td>
+                    <td class="amount">0.00</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3"><strong>Total Amount:</strong></td>
+                    <td id="total_amount">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="d-flex justify-content-between">
+            <button type="submit">Save</button>
+            <button type="button" onclick="printSlip()">Print PDF</button>
+        </div>
+    </form>
+
+    <script>
+      document.querySelectorAll('.kg-input').forEach(input => {
+          input.addEventListener('input', function() {
+              let rate = parseFloat(this.dataset.rate);
+              let kg = parseFloat(this.value) || 0;
+              let totalAmount = rate * kg;
+              this.closest('tr').querySelector('.amount').innerText = totalAmount.toFixed(2);
+
+              calculateTotal();
+          });
+      });
+
+      function calculateTotal() {
+          let total = 0;
+          document.querySelectorAll('.amount').forEach(amountCell => {
+              total += parseFloat(amountCell.innerText);
+          });
+          document.getElementById('total_amount').innerText = total.toFixed(2);
+      }
+
+      function printSlip() {
+          let content = document.body.innerHTML;
+          let printWindow = window.open('', '', 'width=800,height=600');
+          printWindow.document.write('<html><head><title>Chicken Order Slip</title></head><body>');
+          printWindow.document.write(content);
+          printWindow.document.write('</body></html>');
+          printWindow.document.close();
+          printWindow.print();
+      }
+    </script>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

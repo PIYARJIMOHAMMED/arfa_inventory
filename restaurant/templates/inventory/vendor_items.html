@@ -1,0 +1,6 @@
+<h1>Items for Vendor: {{ vendor.name }}</h1>
+<ul>
+    {% for item in items %}
+    <li>{{ item.name }} ({{ item.category }})</li>
+    {% endfor %}
+</ul>

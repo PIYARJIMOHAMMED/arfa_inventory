@@ -1,0 +1,29 @@
+<h1>Purchase Order: {{ purchase.purchase_order_no }}</h1>
+<p>Vendor: {{ purchase.vendor.name }}</p>
+<p>Invoice No: {{ purchase.invoice_no }}</p>
+<p>Total Amount: {{ purchase.total_amount }}</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Unit</th>
+            <th>Price</th>
+            <th>Amount</th>
+            <th>Tax</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.raw_material.name }}</td>
+            <td>{{ item.qty }}</td>
+            <td>{{ item.unit }}</td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.amount }}</td>
+            <td>{{ item.tax }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
