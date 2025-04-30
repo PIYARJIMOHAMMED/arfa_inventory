@@ -77,15 +77,21 @@ class RawMaterial(models.Model):
 
     UNIT_CHOICES = [
         ('kg', 'Kilogram'),
-        ('gram', 'Gram'),
+        ('250gram', '250Gram'),
+        ('500gram', '500Gram'),
+        ('750gram', '750Gram'),
         ('ltr', 'Liter'),
         ('box', 'Box'),
         ('10kg bag', '10kg Bag'),
         ('25kg bag', '25kg Bag'),
         ('50kg bag', '50kg Bag'),
         ('ml', 'Milliliter'),
+        ('100ml', '100Milliliter'),
+        ('200ml', '200Milliliter'),
         ('bottle', 'Bottle'),
         ('pkts', 'Packets'),
+        ('200gmpkts', '200gmPackets'),
+        ('400gmpkts', '400gmPackets'),
         ('can', 'Can'),
         ('bun', 'Bun'),
         ('extra', 'Extra')
