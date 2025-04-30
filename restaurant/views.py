@@ -276,16 +276,13 @@ def purchase_history(request):
         
         if start_date and end_date:
             purchases = purchases.filter(invoice_date__range=[start_date, end_date])
-            chicken_orders = chicken_orders.filter(invoice_date__range=[start_date, end_date])
         
         if status:
             purchases = purchases.filter(status=status)
-            chicken_orders = chicken_orders.filter(status=status)
 
-    combined_purchases = list(purchases) + list(chicken_orders)
 
     return render(request, 'inventory/purchase_history.html', {
-        'purchases': combined_purchases,
+        'purchases': purchases,
         'form': form
     })
 
@@ -313,9 +310,6 @@ def export_purchases(request):
 
 def generate_purchase_order_no():
     return f"PO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-
-
 
 
 from django.shortcuts import render, redirect
@@ -354,47 +348,74 @@ def chicken_rate_entry(request):
     return render(request, 'inventory/chicken_rate_entry.html', {'form': form})
 
 
-from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from .models import ChickenOrder, generate_unique_invoice_no
 from datetime import datetime
+from django.template.loader import render_to_string
+import pdfkit  # OR weasyprint if you prefer
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import ChickenOrder, Vendor, Purchase, generate_unique_invoice_no
+from .models import RawMaterial
 
 def save_chicken_order(request):
     if request.method == 'POST':
         try:
-            invoice_date = request.POST.get('invoice_date')
-            if not invoice_date:
-                invoice_date = datetime.today().date()  # Fallback to today if not provided
-
+            print_choice = request.POST.get('print_choice', 'no')
+            invoice_date = request.POST.get('invoice_date') or datetime.today().date()
+            receiver_name = request.POST.get('receiver_name', 'Auto Receiver')
             items = ['boiler', 'mini', 'boneless', 'wings', 'tungdi', 'chaap']
             total_amount = 0
+            order_items = []
 
-            order_data = {}
             for item in items:
                 rate = float(request.POST.get(f'rate_{item}', 0))
                 qty = float(request.POST.get(f'qty_{item}', 0))
                 amount = rate * qty
-                total_amount += amount
-                order_data[item] = {'rate': rate, 'qty': qty, 'amount': amount}
+                if qty > 0:
+                    order_items.append({'item': item, 'rate': rate, 'qty': qty, 'amount': amount})
+                    total_amount += amount
 
-            # Generate a unique invoice number dynamically
-            unique_invoice_no = generate_unique_invoice_no()
+                    # Update stock or create new item
+                    raw_item, created = RawMaterial.objects.get_or_create(
+                        name=item,
+                        category='Meat & Poultry',
+                        defaults={
+                            'unit': 'kg',
+                            'purchase_price': rate,
+                            'current_stock': 0,
+                            'storage': 'Meat & Poultry',
+                            'minimum_stock_level': 0  # ✅ Add this line
+                        }
+                    )
 
-            # Save the order with a dynamically generated invoice number
+                    raw_item.current_stock += qty
+                    raw_item.purchase_price = rate
+                    raw_item.save()
+
+            invoice_no = generate_unique_invoice_no()
+            vendor = get_object_or_404(Vendor, name__iexact="Shah supplier")
+
             ChickenOrder.objects.create(
-                vendor_id=1,  # Change this dynamically as needed
-                invoice_no=unique_invoice_no,
+                vendor=vendor,
+                invoice_no=invoice_no,
                 invoice_date=invoice_date,
-                total_amount=total_amount
+                total_amount=total_amount,
+                receiver_name=receiver_name,
             )
 
-            return HttpResponse(f"Order saved successfully! Invoice No: {unique_invoice_no}, Total: {total_amount}")
+            if print_choice == 'yes':
+                html = render_to_string("inventory/print_bill.html", {
+                    'invoice_no': invoice_no,
+                    'invoice_date': invoice_date,
+                    'items': order_items,
+                    'total': total_amount
+                })
+                return HttpResponse(html)
 
+            return HttpResponse(f"Order saved successfully! Invoice No: {invoice_no}, Total: {total_amount}")
         except Exception as e:
             return HttpResponse(f"Error: {e}", status=400)
 
     return redirect('chicken_rate_entry')
-
 
 
 # daily purchase summary
@@ -453,6 +474,7 @@ def stock_book(request):
     total_items = RawMaterial.objects.count()
     stock_room_items = RawMaterial.objects.filter(storage='Supply Room').count()
     cold_storage_items = RawMaterial.objects.filter(storage='Cold Storage').count()
+    meat_poultry_view = RawMaterial.objects.filter(storage='Meat & Poultry').count()
 
     total_stock_value = RawMaterial.objects.aggregate(
         total_value=Sum('purchase_price')
@@ -462,6 +484,7 @@ def stock_book(request):
         'total_items': total_items,
         'stock_room_items': stock_room_items,
         'cold_storage_items': cold_storage_items,
+        'meat_poultry_view': meat_poultry_view,
         'total_stock_value': total_stock_value,
     })
 
@@ -474,14 +497,8 @@ def cold_storage_view(request):
     return render(request, 'inventory/cold_storage.html', {'items': cold_storage_items})
 
 
-
-from django.shortcuts import get_object_or_404
-from django.contrib import messages
-from .models import RawMaterial
-from .forms import ManualStockUpdateForm
-
-def stock_room_view(request):
-    stock_room_items = RawMaterial.objects.filter(storage='Supply Room')
+def meat_poultry_view(request):
+    poultry_items = RawMaterial.objects.filter(storage='Meat & Poultry')
 
     if request.method == 'POST':
         item_id = request.POST.get('item_id')
@@ -490,9 +507,164 @@ def stock_room_view(request):
         if form.is_valid():
             form.save()
             item.check_threshold()
-            messages.success(request, f"{item.name} stock updated successfully!")
+            messages.success(request, f"{item.name} updated successfully!")
         else:
             messages.error(request, "Failed to update stock.")
+
+    total_value = sum(item.total_value() for item in poultry_items)
+
+    return render(request, 'inventory/meat_poultry_room.html', {
+        'items': poultry_items,
+        'total_value': total_value,
+        'form': ManualStockUpdateForm(),
+    })
+
+# views.py
+from django.utils.timezone import now
+from django.contrib import messages
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import RawMaterial, DailyReport, DailyStockReport, LowStockAlert
+
+def meat_poultry_close_day_view(request):
+    poultry_items = RawMaterial.objects.filter(storage='Meat & Poultry')
+
+    if request.method == 'POST':
+        today = now().date()
+
+        daily_report, created = DailyReport.objects.get_or_create(
+            date=today,
+            defaults={'storage': 'Meat & Poultry'}
+        )
+
+        if not created and daily_report.storage != 'Meat & Poultry':
+            daily_report.storage = 'Meat & Poultry'
+            daily_report.save()
+
+        low_stock_items = []
+
+        for item in poultry_items:
+            opening_stock = item.current_stock
+            entered_closing_stock = float(request.POST.get(f'closing_stock_{item.id}', opening_stock))
+            used_stock = opening_stock - entered_closing_stock
+
+            report_entry, created = DailyStockReport.objects.get_or_create(
+                report=daily_report,
+                item=item,
+                defaults={
+                    'opening_stock': opening_stock,
+                    'closing_stock': entered_closing_stock,
+                    'used_stock': used_stock
+                }
+            )
+
+            if not created:
+                report_entry.opening_stock = opening_stock
+                report_entry.closing_stock = entered_closing_stock
+                report_entry.used_stock = used_stock
+                report_entry.save()
+
+            item.current_stock = entered_closing_stock
+            item.save()
+
+            if entered_closing_stock < item.minimum_stock_level:
+                LowStockAlert.objects.create(
+                    item=item,
+                    current_stock=entered_closing_stock,
+                    minimum_stock_level=item.minimum_stock_level
+                )
+                low_stock_items.append(item)
+
+        if low_stock_items:
+            send_low_stock_pdf_report(low_stock_items)
+
+        messages.success(request, "Meat & Poultry Day closed and report generated.")
+        return redirect('meat_poultry_daily_report_list')
+
+    return render(request, 'inventory/meat_poultry_close_day_form.html', {'items': poultry_items})
+from django.views.generic import ListView, DetailView
+from datetime import datetime
+
+class MeatPoultryDailyReportListView(ListView):
+    model = DailyReport
+    template_name = 'inventory/meat_poultry_daily_report_list.html'
+    context_object_name = 'reports'
+
+    def get_queryset(self):
+        return DailyReport.objects.filter(storage='Meat & Poultry').order_by('-date')
+class MeatPoultryDailyReportDetailView(DetailView):
+    model = DailyReport
+    template_name = 'inventory/meat_poultry_daily_report_detail.html'
+    context_object_name = 'report'
+
+    def get_object(self):
+        date_str = self.kwargs.get('date')
+        parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        return get_object_or_404(DailyReport, date=parsed_date, storage='Meat & Poultry')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['entries'] = self.object.daily_stock_reports.filter(item__storage='Meat & Poultry')
+        return context
+
+
+
+from .models import RawMaterial, DailyStockReport, LowStockAlert, DailyReport
+from django.core.mail import send_mail
+from django.conf import settings
+from .forms import ManualStockUpdateForm
+
+
+def stock_room_view(request):
+    stock_room_items = RawMaterial.objects.filter(storage='Supply Room')
+
+    if request.method == 'POST':
+        if 'close_day' in request.POST:
+            today = now().date()
+            daily_report, created = DailyReport.objects.get_or_create(date=today)
+
+            for item in stock_room_items:
+                opening_stock = item.current_stock
+                used_stock = item.current_stock - float(request.POST.get(f'current_stock_{item.id}', item.current_stock))
+                
+                stock_report, created = DailyStockReport.objects.get_or_create(
+                    report=daily_report,
+                    item=item,
+                    defaults={
+                        'opening_stock': opening_stock + used_stock,
+                        'closing_stock': item.current_stock,
+                        'used_stock': used_stock,
+                    }
+                )
+
+                if not created:
+                    # Update the existing stock report
+                    stock_report.opening_stock = opening_stock + used_stock
+                    stock_report.closing_stock = item.current_stock
+                    stock_report.used_stock = used_stock
+                    stock_report.save()
+
+            messages.success(request, "Day closed and report generated successfully!")
+            return redirect('daily_report_list')
+
+        else:
+            # Regular stock update
+            item_id = request.POST.get('item_id')
+            item = get_object_or_404(RawMaterial, id=item_id)
+            form = ManualStockUpdateForm(request.POST, instance=item)
+            if form.is_valid():
+                form.save()
+                item.check_threshold()
+                # After update, check stock threshold
+                if item.current_stock < item.minimum_stock_level:
+                    LowStockAlert.objects.create(
+                        item=item,
+                        current_stock=item.current_stock,
+                        minimum_stock_level=item.minimum_stock_level
+                    )
+                    send_low_stock_pdf_report(item)
+                messages.success(request, f"{item.name} stock updated successfully!")
+            else:
+                messages.error(request, "Failed to update stock.")
 
     total_value = sum(item.total_value() for item in stock_room_items)
 
@@ -503,7 +675,137 @@ def stock_room_view(request):
     })
 
 
-from django.shortcuts import render, get_object_or_404, redirect
+from django.views.generic import ListView, DetailView
+class DailyReportListView(ListView):
+    model = DailyReport
+    template_name = 'inventory/daily_report_list.html'
+    context_object_name = 'reports'
+    ordering = ['-date']
+
+
+from django.shortcuts import get_object_or_404
+
+from django.utils.timezone import now
+from datetime import datetime
+
+class daily_report_detail_view(DetailView):
+    model = DailyReport
+    template_name = 'inventory/daily_report_detail.html'
+    context_object_name = 'report'
+
+    def get_object(self):
+        date_str = self.kwargs.get('date')  # get date from URL
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        return get_object_or_404(DailyReport, date=date)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['stock_reports'] = self.object.daily_stock_reports.filter(item__storage='Supply Room')
+        return context
+
+
+
+import io
+from django.core.mail import EmailMessage
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from datetime import timedelta
+from django.utils.timezone import now
+from django.db.models import Avg
+
+def close_day_view(request):
+    stock_room_items = RawMaterial.objects.filter(storage='Supply Room')
+
+    if request.method == 'POST':
+        today = now().date()
+        daily_report, created = DailyReport.objects.get_or_create(date=today)
+        low_stock_items = []
+
+        for item in stock_room_items:
+            opening_stock = item.current_stock
+            entered_closing_stock = float(request.POST.get(f'closing_stock_{item.id}', opening_stock))
+            used_stock = opening_stock - entered_closing_stock
+
+            # Save to DailyStockReport
+            stock_report, created = DailyStockReport.objects.get_or_create(
+                report=daily_report,
+                item=item,
+                defaults={
+                    'opening_stock': opening_stock,
+                    'closing_stock': entered_closing_stock,
+                    'used_stock': used_stock,
+                }
+            )
+            if not created:
+                stock_report.opening_stock = opening_stock
+                stock_report.closing_stock = entered_closing_stock
+                stock_report.used_stock = used_stock
+                stock_report.save()
+
+            # Update RawMaterial current stock
+            item.current_stock = entered_closing_stock
+            item.save()
+
+            # Check for low stock
+            if entered_closing_stock < item.minimum_stock_level:
+                LowStockAlert.objects.create(
+                    item=item,
+                    current_stock=entered_closing_stock,
+                    minimum_stock_level=item.minimum_stock_level
+                )
+                low_stock_items.append(item)
+
+        # Generate and send low stock report if needed
+        if low_stock_items:
+            send_low_stock_pdf_report(low_stock_items)
+
+        messages.success(request, "Day closed and report generated successfully!")
+        return redirect('daily_report_list')
+
+    return render(request, 'inventory/close_day_form.html', {'items': stock_room_items})
+
+def send_low_stock_pdf_report(low_stock_items):
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, height - 50, "Low Stock Report")
+    p.setFont("Helvetica", 12)
+    p.drawString(50, height - 70, f"Date: {now().date().strftime('%d %b %Y')}")
+
+    y = height - 100
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y, "Item")
+    p.drawString(200, y, "Current Stock")
+    p.drawString(320, y, "Min Required")
+    p.drawString(450, y, "Avg Daily Usage")
+
+    p.setFont("Helvetica", 11)
+    y -= 20
+    for item in low_stock_items:
+        avg_usage = DailyStockReport.objects.filter(item=item).aggregate(avg=Avg('used_stock'))['avg'] or 0.0
+        p.drawString(50, y, item.name)
+        p.drawString(200, y, f"{item.current_stock}")
+        p.drawString(320, y, f"{item.minimum_stock_level}")
+        p.drawString(450, y, f"{round(avg_usage, 2)}")
+        y -= 20
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    email = EmailMessage(
+        subject="🚨 Low Stock Report",
+        body="Please find attached today's low stock report.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[settings.ADMIN_EMAIL]
+    )
+    email.attach('LowStockReport.pdf', buffer.read(), 'application/pdf')
+    email.send()
+
+
+
 from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.conf import settings
@@ -519,7 +821,16 @@ def get_vendors_for_item(request, item_id):
     return JsonResponse({'vendors': list(vendors)})
 
 from django.db.models import Sum, F
-from .models import RawMaterial
+from .models import RawMaterial, DailyStockReport, LowStockAlert, DailyReport
+from django.utils.timezone import now
+from django.core.mail import EmailMessage
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.db.models import Avg
+import io
+
 
 def cold_storage_view(request):
     cold_storage_items = RawMaterial.objects.filter(storage='Cold Storage')
@@ -545,6 +856,95 @@ def cold_storage_view(request):
         'items': cold_storage_items,
         'total_value': round(total_value, 2)
     })
+
+
+def cold_storage_close_day_view(request):
+    cold_storage_items = RawMaterial.objects.filter(storage='Cold Storage')
+
+    if request.method == 'POST':
+        today = now().date()
+
+        daily_report, created = DailyReport.objects.get_or_create(
+            date=today,
+            storage='Cold Storage',
+            defaults={'storage': 'Cold Storage'}
+        )
+
+
+        if not created and daily_report.storage != 'Cold Storage':
+            daily_report.storage = 'Cold Storage'
+            daily_report.save()
+
+        low_stock_items = []
+
+        for item in cold_storage_items:
+            opening_stock = item.current_stock
+            entered_closing_stock = float(request.POST.get(f'closing_stock_{item.id}', opening_stock))
+            used_stock = opening_stock - entered_closing_stock
+
+            report_entry, created = DailyStockReport.objects.get_or_create(
+                report=daily_report,
+                item=item,
+                defaults={
+                    'opening_stock': opening_stock,
+                    'closing_stock': entered_closing_stock,
+                    'used_stock': used_stock
+                }
+            )
+
+            if not created:
+                report_entry.opening_stock = opening_stock
+                report_entry.closing_stock = entered_closing_stock
+                report_entry.used_stock = used_stock
+                report_entry.save()
+
+            item.current_stock = entered_closing_stock
+            item.save()
+
+            if entered_closing_stock < item.minimum_stock_level:
+                LowStockAlert.objects.create(
+                    item=item,
+                    current_stock=entered_closing_stock,
+                    minimum_stock_level=item.minimum_stock_level
+                )
+                low_stock_items.append(item)
+
+        if low_stock_items:
+            send_low_stock_pdf_report(low_stock_items)
+
+        messages.success(request, "Cold Storage day closed and report generated.")
+        return redirect('cold_storage_daily_report_list')
+
+    return render(request, 'inventory/cold_storage_close_day_form.html', {'items': cold_storage_items})
+
+
+
+class ColdStorageDailyReportListView(ListView):
+    model = DailyReport
+    template_name = 'inventory/cold_storage_daily_report_list.html'
+    context_object_name = 'reports'
+
+    def get_queryset(self):
+        return DailyReport.objects.filter(storage='Cold Storage').order_by('-date')
+
+
+class ColdStorageDailyReportDetailView(DetailView):
+    model = DailyReport
+    template_name = 'inventory/cold_storage_daily_report_detail.html'
+    context_object_name = 'report'
+
+    def get_object(self):
+        date_str = self.kwargs.get('date')
+        parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        return get_object_or_404(DailyReport, date=parsed_date, storage='Cold Storage')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['entries'] = self.object.daily_stock_reports.filter(item__storage='Cold Storage')
+        return context
+
+
+
 
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -577,8 +977,9 @@ from django.contrib.auth.models import User
 from .models import RawMaterial, Vendor
 import urllib.parse
 
-# Fetch vendors for a specific item
 def get_vendors_for_item(request, item_id):
     item = get_object_or_404(RawMaterial, id=item_id)
     vendors = Vendor.objects.filter(items__id=item_id).values('id', 'name')
     return JsonResponse({'vendors': list(vendors)})
+
+

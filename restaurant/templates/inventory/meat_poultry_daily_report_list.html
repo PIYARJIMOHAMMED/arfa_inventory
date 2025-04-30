@@ -1,0 +1,127 @@
+{% block styles %}
+<style>
+    body {
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #dc3545;
+        text-align: center;
+        margin-bottom: 25px;
+        padding-top: 20px;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    .table th,
+    .table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .table thead th {
+        background-color: #007BFF;
+        color: white;
+        vertical-align: middle;
+        border-bottom: 2px solid #0056b3;
+    }
+
+    .table tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+
+    a {
+        color: #007BFF;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s;
+        padding: 5px 10px;
+        border-radius: 4px;
+    }
+
+    a:hover {
+        color: #0056b3;
+        text-decoration: underline;
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 8px;
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        body {
+            padding: 10px;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        
+        .table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Meat & Poultry - Daily Stock Reports</h2>
+    
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>View Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td>{{ report.date|date:"F d, Y" }}</td>
+                <td><a href="{% url 'meat_poultry_daily_report_detail' report.date %}">View</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No reports available</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,120 @@
+{% block styles %}
+<style>
+    body {
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #dc3545;
+        text-align: center;
+        margin-bottom: 25px;
+        padding-top: 20px;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    th, td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    thead th {
+        background-color: #007BFF;
+        color: white;
+        vertical-align: middle;
+        border-bottom: 2px solid #0056b3;
+    }
+
+    tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    a {
+        color: #007BFF;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+
+    a:hover {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+        }
+        
+        th, td {
+            padding: 8px;
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        body {
+            padding: 10px;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Daily Stock Reports</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>View Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td>{{ report.date }}</td>
+                <td>
+                    <a href="{% url 'daily_report_detail' report.date|date:'Y-m-d' %}">View</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No reports available.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% block styles %}
+<style>
+    body {
+        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #dc3545;
+        text-align: center;
+        margin-bottom: 25px;
+        padding-top: 20px;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .table th,
+    .table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .table thead th {
+        background-color: #007BFF;
+        color: white;
+        vertical-align: middle;
+        border-bottom: 2px solid #0056b3;
+    }
+
+    .table tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+
+    .btn-primary {
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        font-size: 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        display: block;
+        margin: 20px auto 0;
+        transition: all 0.3s;
+        text-decoration: none;
+        text-align: center;
+        width: fit-content;
+    }
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .empty-message {
+        text-align: center;
+        color: #6c757d;
+        padding: 20px;
+        font-style: italic;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .container {
+            padding: 15px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 8px;
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        body {
+            padding: 10px;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        
+        .table {
+            display: block;
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Daily Report - {{ report.date }}</h2>
+    
+    {% if entries %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Opening Stock</th>
+                <th>Closing Stock</th>
+                <th>Used Stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.item.name }}</td>
+                <td>{{ entry.opening_stock }}</td>
+                <td>{{ entry.closing_stock }}</td>
+                <td>{{ entry.used_stock }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-message">No stock records for this date.</p>
+    {% endif %}
+
+    <a href="{% url 'cold_storage_daily_report_list' %}" class="btn-primary">Back to Report List</a>
+</div>
+{% endblock %}

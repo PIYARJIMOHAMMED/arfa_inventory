@@ -101,8 +101,8 @@
         </table>
 
         <div class="d-flex justify-content-between">
-            <button type="submit">Save</button>
-            <button type="button" onclick="printSlip()">Print PDF</button>
+            <button type="button" class="btn btn-success" onclick="handleSave()">Save</button>
+            <input type="hidden" name="print_choice" id="print_choice" value="no">
         </div>
     </form>
 
@@ -136,6 +136,14 @@
           printWindow.print();
       }
     </script>
+    <script>
+        function handleSave() {
+            const shouldPrint = confirm("Do you want to print the bill?");
+            document.getElementById('print_choice').value = shouldPrint ? 'yes' : 'no';
+            document.querySelector('form').submit();
+        }
+    </script>
+    
 
 </div>
 

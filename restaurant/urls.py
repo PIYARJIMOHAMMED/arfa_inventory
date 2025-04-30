@@ -6,7 +6,10 @@ from .views import raw_material_list, add_raw_material, edit_raw_material
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
-
+from .views import DailyReportListView, daily_report_detail_view
+from .views import ColdStorageDailyReportListView, ColdStorageDailyReportDetailView
+from .views import MeatPoultryDailyReportListView, MeatPoultryDailyReportDetailView
+ 
 
 
 urlpatterns = [
@@ -36,7 +39,19 @@ urlpatterns = [
     path('stock-book/', views.stock_book, name='stock_book'),
     path('stock-room/', views.stock_room_view, name='stock_room'),
     path('cold-storage/', views.cold_storage_view, name='cold_storage'),
+    path('meat-poultry-room/', views.meat_poultry_view, name='meat_poultry_room'),
+    path('daily-reports/', DailyReportListView.as_view(), name='daily_report_list'),
+    path('close-day/', views.close_day_view, name='close_day'),
+    path('daily-reports/', views.DailyReportListView.as_view(), name='daily_report_list'),
+    path('daily-reports/<date>/', daily_report_detail_view.as_view(), name='daily_report_detail'),
+    path('cold-storage/close-day/', views.cold_storage_close_day_view, name='cold_storage_close_day'),
+    path('cold-storage/reports/', ColdStorageDailyReportListView.as_view(), name='cold_storage_daily_report_list'),
+    path('cold-storage/reports/<date>/', ColdStorageDailyReportDetailView.as_view(), name='cold_storage_daily_report_detail'),
+    path('meat-poultry/close-day/', views.meat_poultry_close_day_view, name='meat_poultry_close_day'),
+    path('meat-poultry/reports/', MeatPoultryDailyReportListView.as_view(), name='meat_poultry_daily_report_list'),
+    path('meat-poultry/reports/<date>/', MeatPoultryDailyReportDetailView.as_view(), name='meat_poultry_daily_report_detail'),
+
+
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-
 

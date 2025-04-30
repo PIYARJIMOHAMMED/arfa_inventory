@@ -93,14 +93,15 @@ class RawMaterial(models.Model):
 
     STORAGE_CHOICES = [
         ('Supply Room', 'Supply Room'),
-        ('Cold Storage', 'Cold Storage')
+        ('Cold Storage', 'Cold Storage'),
+        ('Meat & Poultry', 'Meat & Poultry')
     ]
 
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES)
     unit = models.CharField(max_length=50, choices=UNIT_CHOICES, null=True)
     purchase_price = models.FloatField()
-    minimum_stock_level = models.FloatField()
+    minimum_stock_level = models.FloatField(default=0)
     current_stock = models.FloatField(default=0.0)
     vendors = models.ManyToManyField('Vendor', related_name='raw_material_vendors')
     is_available = models.BooleanField(default=True)
@@ -245,3 +246,41 @@ class ChickenOrder(models.Model):
  
     def __str__(self):
         return f"Chicken Order {self.invoice_no} - {self.vendor.name}"
+
+
+
+from django.db import models
+from django.utils import timezone
+
+
+class DailyReport(models.Model):
+    date = models.DateField()
+    storage = models.CharField(max_length=50, null=True)
+
+    class Meta:
+        unique_together = ('date', 'storage')  # Ensure only one report per date+storage combo
+
+    def __str__(self):
+        return f"{self.storage} Report - {self.date.strftime('%d %b %Y')}"
+
+
+class DailyStockReport(models.Model):
+    report = models.ForeignKey(DailyReport, on_delete=models.CASCADE, related_name="daily_stock_reports", null = True)
+    item = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, null=True)
+    opening_stock = models.FloatField()
+    closing_stock = models.FloatField()
+    used_stock = models.FloatField()
+
+    def __str__(self):
+        return f"{self.item.name} Report for {self.report.date}"
+
+
+
+class LowStockAlert(models.Model):
+    date = models.DateField(default=timezone.now)
+    item = models.ForeignKey('RawMaterial', on_delete=models.CASCADE)
+    current_stock = models.FloatField()
+    minimum_stock_level = models.FloatField()
+
+    def __str__(self):
+        return f"Low Stock: {self.item.name} ({self.current_stock})"

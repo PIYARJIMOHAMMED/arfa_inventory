@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from restaurant import views 
 from django.shortcuts import redirect
+from django.conf.urls.i18n import i18n_patterns
 
 
 urlpatterns = [
@@ -25,8 +26,5 @@ urlpatterns = [
     path('', include('restaurant.urls')),  
     path('restaurant/', include('restaurant.urls')),
     path('', lambda request: redirect('login')),
-
-
-
 ]
 
